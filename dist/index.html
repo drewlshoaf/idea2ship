@@ -3,113 +3,59 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f3ef">
-  <meta name="description" content="Forge is an agentic product studio for turning rough ideas into implementation-ready product packages.">
-  <title>Forge — Agentic Product Studio</title>
+  <meta name="theme-color" content="#f4f7ff">
+  <meta name="description" content="idea2ship is an agentic product studio that turns promising ideas into implementation-ready plans.">
+  <title>idea2ship — From ideas to impact</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="#" aria-label="Forge home"><span class="brand-mark">F</span><span>FORGE</span></a>
-      <div class="project-switcher">
-        <span class="eyebrow">PROJECT</span>
-        <button type="button">PassOrFail.ai <span>⌄</span></button>
-      </div>
-      <div class="run-meta"><span class="live-dot"></span><span>Run 014</span><span class="divider"></span><span>02:31</span></div>
-      <button class="icon-button" type="button" aria-label="Notifications">2</button>
-      <button class="avatar" type="button" aria-label="Account menu">DS</button>
-    </header>
-
-    <aside class="rail" aria-label="Main navigation">
-      <nav>
-        <button class="rail-item" type="button" data-view="dashboard" aria-label="Dashboard"><span>⌂</span><small>Home</small></button>
-        <button class="rail-item active" type="button" data-view="workspace" aria-label="Workspace"><span>◫</span><small>Run</small></button>
-        <button class="rail-item" type="button" data-view="architecture" aria-label="Architecture"><span>⬡</span><small>Map</small></button>
-        <button class="rail-item" type="button" data-view="backlog" aria-label="Backlog"><span>▤</span><small>Plan</small></button>
+    <aside class="sidebar">
+      <a class="brand" href="#" data-view="dashboard" aria-label="idea2ship dashboard">
+        <span class="brand-rocket">🚀</span>
+        <span class="brand-word">idea<span>2</span>ship</span>
+      </a>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span>Dashboard</button>
+        <button class="nav-item new-project"><span class="nav-icon">＋</span>New Project</button>
+        <button class="nav-item" data-view="workspace"><span class="nav-icon">▣</span>Projects</button>
+        <button class="nav-item" data-view="artifacts"><span class="nav-icon">▧</span>Artifacts</button>
+        <button class="nav-item" data-view="architecture"><span class="nav-icon">◇</span>Architecture</button>
+        <button class="nav-item" data-view="backlog"><span class="nav-icon">☷</span>Backlog</button>
+        <button class="nav-item" data-view="agents"><span class="nav-icon">✣</span>Agents &amp; Tools</button>
+        <button class="nav-item" data-view="templates"><span class="nav-icon">◫</span>Templates</button>
+        <button class="nav-item setup-button"><span class="nav-icon">⚙</span>Settings</button>
       </nav>
-      <button class="rail-item" type="button" aria-label="Settings"><span>⚙</span><small>Setup</small></button>
+      <div class="sidebar-bottom">
+        <section class="upgrade-card">
+          <div class="upgrade-spark">✦</div>
+          <strong>Build something amazing.</strong>
+          <p>More agents. Clearer plans. Faster shipping.</p>
+          <button class="text-button" type="button">Explore Pro <span>→</span></button>
+        </section>
+        <p class="sidebar-signoff">From ideas to impact.</p>
+      </div>
     </aside>
 
-    <main id="app" class="workspace">
-      <section class="workspace-head">
-        <div>
-          <div class="breadcrumb"><span>PassOrFail.ai</span><b>/</b><span>Product definition</span></div>
-          <h1>Agent workspace</h1>
+    <div class="page-frame">
+      <header class="topbar">
+        <label class="search-box">
+          <span>⌕</span>
+          <input type="search" placeholder="Search projects, agents, artifacts..." aria-label="Search">
+          <kbd>⌘ K</kbd>
+        </label>
+        <div class="top-actions">
+          <button class="primary-button top-new new-project" type="button"><span>＋</span> New Project</button>
+          <button class="notification-button" type="button" aria-label="Notifications">♧<i></i></button>
+          <button class="profile-button" type="button"><span class="avatar">DS</span><span><strong>Andrew Shoaf</strong><small>Founder</small></span><b>⌄</b></button>
         </div>
-        <div class="head-actions">
-          <button class="ghost-button" type="button">Pause run</button>
-          <button class="primary-button" type="button">View deliverables <span>↗</span></button>
-        </div>
-      </section>
-
-      <section class="control-grid">
-        <aside class="agents-panel panel">
-          <div class="panel-head"><span>EXECUTION GRAPH</span><button aria-label="Graph options">•••</button></div>
-          <div class="graph-status"><strong>5 agents</strong><span>3 complete · 1 active</span></div>
-          <div class="agent-graph">
-            <article class="agent-card complete">
-              <div class="agent-icon strategy">◈</div><div><h3>Strategist</h3><p>Product brief</p></div><span class="status-icon">✓</span>
-            </article>
-            <div class="branch-line"><i></i><span></span></div>
-            <article class="agent-card complete">
-              <div class="agent-icon research">⌕</div><div><h3>Researcher</h3><p>Market evidence</p></div><span class="status-icon">✓</span>
-            </article>
-            <div class="flow-line"></div>
-            <article class="agent-card running">
-              <div class="agent-icon ux">◇</div><div><h3>UX Designer</h3><p>Designing flows</p></div><span class="pulse-ring"></span>
-            </article>
-            <div class="flow-line muted"></div>
-            <article class="agent-card waiting">
-              <div class="agent-icon architecture">⬡</div><div><h3>Architect</h3><p>Waiting for UX</p></div><span class="status-icon">○</span>
-            </article>
-            <div class="flow-line muted"></div>
-            <article class="agent-card waiting">
-              <div class="agent-icon engineer">▤</div><div><h3>Engineer</h3><p>Waiting</p></div><span class="status-icon">○</span>
-            </article>
-          </div>
-          <div class="agent-metrics"><span><b>12.4k</b> tokens</span><span><b>8</b> tool calls</span></div>
-        </aside>
-
-        <section class="artifact-panel panel">
-          <div class="artifact-toolbar">
-            <div><span class="file-icon">▧</span><div><h2>Product requirements</h2><p>Version 3 · Generated by Strategist</p></div></div>
-            <div class="artifact-actions"><button type="button" aria-label="Version history">v3⌄</button><button type="button" aria-label="More options">•••</button></div>
-          </div>
-          <article class="document">
-            <div class="approval-banner"><span>✓</span><p><strong>Approved artifact</strong><br>Downstream agents may use this version.</p><time>2 min ago</time></div>
-            <div class="doc-kicker">PRODUCT BRIEF / 01</div>
-            <h2>Earlier signals.<br><em>Better interventions.</em></h2>
-            <p class="lede">PassOrFail.ai helps course instructors identify at-risk students while there is still time to act.</p>
-            <hr>
-            <div class="doc-section"><span>01</span><div><h3>Problem</h3><p>Educators often discover struggling students after critical intervention windows have closed. Early academic and behavioral signals exist, but they are fragmented across systems and difficult to interpret.</p></div></div>
-            <div class="doc-section"><span>02</span><div><h3>Primary user</h3><div class="user-card"><span>IN</span><div><strong>Course instructor</strong><p>Manages 30–200 learners across one or more courses.</p></div></div></div></div>
-            <div class="doc-section"><span>03</span><div><h3>MVP outcomes</h3><ul><li><i>1</i>Prioritized student risk queue</li><li><i>2</i>Transparent contributing factors</li><li><i>3</i>Actionable intervention recommendations</li></ul></div></div>
-          </article>
-          <div class="review-bar">
-            <div><button class="danger-button" type="button">Reject</button><button class="ghost-button" type="button">Revise</button></div>
-            <button class="approve-button" type="button"><span>✓</span> Approved</button>
-          </div>
-        </section>
-
-        <aside class="activity-panel panel">
-          <div class="panel-head"><span>LIVE ACTIVITY</span><button aria-label="Filter activity">≡</button></div>
-          <div class="activity-summary"><span class="live-dot"></span><strong>Run in progress</strong><small>Auto-scroll on</small></div>
-          <div class="activity-stream">
-            <article class="activity-item active-event"><time>NOW</time><div class="timeline-mark"></div><div><strong>UX Designer</strong><p>Mapping instructor intervention flow</p><span class="event-chip">WORKING</span></div></article>
-            <article class="activity-item"><time>14:32</time><div class="timeline-mark tool"></div><div><strong>Tool call completed</strong><p>Search · 18 sources found</p><button class="tool-link" type="button">View MCP call <span>↗</span></button></div></article>
-            <article class="activity-item"><time>14:31</time><div class="timeline-mark done"></div><div><strong>Artifact approved</strong><p>Product requirements v3</p></div></article>
-            <article class="activity-item"><time>14:29</time><div class="timeline-mark done"></div><div><strong>Researcher completed</strong><p>Market evidence · 01:08</p></div></article>
-            <article class="activity-item"><time>14:28</time><div class="timeline-mark tool"></div><div><strong>GitHub search</strong><p>student performance prediction</p><span class="code-pill">42 repositories</span></div></article>
-          </div>
-          <div class="next-gate"><span>NEXT APPROVAL</span><strong>User flow</strong><p>Expected in ~40 seconds</p></div>
-        </aside>
-      </section>
-    </main>
+      </header>
+      <main id="app" class="main-content" tabindex="-1"></main>
+    </div>
   </div>
   <script src="./app.js"></script>
 </body>
