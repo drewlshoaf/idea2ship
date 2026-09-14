@@ -3,6 +3,8 @@ const workspaceView = app.innerHTML;
 const STORE_KEY = 'forge-studio-state-v1';
 let currentView = 'workspace';
 let studioState = loadStudioState();
+let apiUrl = localStorage.getItem('forge-api-url') || '';
+let activeEventSource = null;
 
 function loadStudioState() {
   try {
@@ -26,6 +28,18 @@ function escapeHtml(value = '') {
 
 function initials(name) {
   return name.split(/\s+/).map(word => word[0]).join('').slice(0, 2).toUpperCase() || 'NP';
+}
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`${apiUrl}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || `Request failed (${response.status})`);
+  }
+  return response.json();
 }
 
 const dashboardView = `
@@ -92,12 +106,16 @@ function dashboardWithProjects() {
 function generatedWorkspace(project) {
   const working = project.stage === 'strategist_running';
   const approved = project.stage === 'strategist_approved';
+  const brief = project.brief || {};
+  const targetUser = brief.target_users?.[0] || 'Primary operator';
+  const features = brief.mvp_features?.slice(0, 3) || ['Capture the minimum useful inputs', 'Produce a clear, explainable output', 'Close the loop with a recommended action'];
   const statusLabel = working ? 'Structuring product brief' : approved ? 'Brief approved' : 'Waiting for your approval';
   const artifact = working ? `
     <article class="document run-document"><div class="generation-state"><span class="spinner"></span><div><strong>Strategist is shaping the brief</strong><p>Clarifying the user, problem, MVP boundary, and success measures.</p></div></div><div class="skeleton-line wide"></div><div class="skeleton-line title"></div><div class="skeleton-line medium"></div><hr><div class="skeleton-grid"><span></span><div><i></i><i></i><i></i></div></div><div class="thinking-log"><span>LIVE REASONING TRACE</span><p class="trace-line">Separating the core job from implementation details…</p></div></article>` : `
-    <article class="document generated-document"><div class="approval-banner ${approved ? '' : 'pending-banner'}"><span>${approved ? '✓' : '!'}</span><p><strong>${approved ? 'Approved artifact' : 'Approval required'}</strong><br>${approved ? 'Research may now use this version.' : 'Review this brief before downstream agents continue.'}</p><time>NOW</time></div><div class="doc-kicker">PRODUCT BRIEF / 01</div><h2>${escapeHtml(project.name)}<br><em>from idea to focus.</em></h2><p class="lede">${escapeHtml(project.idea)}</p><hr><div class="doc-section"><span>01</span><div><h3>Problem</h3><p>The current experience is fragmented, difficult to evaluate, and lacks a clear path from raw input to a confident decision.</p></div></div><div class="doc-section"><span>02</span><div><h3>Primary user</h3><div class="user-card"><span>PU</span><div><strong>Primary operator</strong><p>The person responsible for acting on the product's central insight.</p></div></div></div></div><div class="doc-section"><span>03</span><div><h3>MVP outcomes</h3><ul><li><i>1</i>Capture the minimum useful inputs</li><li><i>2</i>Produce a clear, explainable output</li><li><i>3</i>Close the loop with a recommended action</li></ul></div></div></article>`;
+    <article class="document generated-document"><div class="approval-banner ${approved ? '' : 'pending-banner'}"><span>${approved ? '✓' : '!'}</span><p><strong>${approved ? 'Approved artifact' : 'Approval required'}</strong><br>${approved ? 'Research may now use this version.' : 'Review this brief before downstream agents continue.'}</p><time>NOW</time></div><div class="doc-kicker">PRODUCT BRIEF / 01</div><h2>${escapeHtml(project.name)}<br><em>from idea to focus.</em></h2><p class="lede">${escapeHtml(brief.product_definition || project.idea)}</p><hr><div class="doc-section"><span>01</span><div><h3>Problem</h3><p>${escapeHtml(brief.problem || 'The current experience is fragmented, difficult to evaluate, and lacks a clear path from raw input to a confident decision.')}</p></div></div><div class="doc-section"><span>02</span><div><h3>Primary user</h3><div class="user-card"><span>${initials(targetUser)}</span><div><strong>${escapeHtml(targetUser)}</strong><p>${escapeHtml(brief.value_proposition || "The person responsible for acting on the product's central insight.")}</p></div></div></div></div><div class="doc-section"><span>03</span><div><h3>MVP outcomes</h3><ul>${features.map((feature, index) => `<li><i>${index + 1}</i>${escapeHtml(feature)}</li>`).join('')}</ul></div></div></article>`;
   const reviewBar = working ? `<div class="review-bar run-review"><span>Approval controls unlock when the artifact is ready.</span><button class="approve-button" disabled>Generating…</button></div>` : approved ? `<div class="review-bar"><div><button class="ghost-button dashboard-return">View projects</button></div><button class="approve-button"><span>✓</span> Approved</button></div>` : `<div class="review-bar"><div><button class="danger-button generated-reject">Reject</button><button class="ghost-button generated-revise">Revise</button></div><button class="approve-button approve-generated">Approve & continue →</button></div>`;
-  return `<section class="workspace-head"><div><div class="breadcrumb"><span>${escapeHtml(project.name)}</span><b>/</b><span>Product definition</span></div><h1>Agent workspace</h1></div><div class="head-actions"><button class="ghost-button">Pause run</button><button class="primary-button dashboard-return">View projects <span>↗</span></button></div></section><div class="demo-notice"><span>LOCAL DEMO RUN</span><p>This project is saved on this device. Connect the backend to replace deterministic generation with live agents.</p></div><section class="control-grid dynamic-control"><aside class="agents-panel panel"><div class="panel-head"><span>EXECUTION GRAPH</span><button>•••</button></div><div class="graph-status"><strong>5 agents</strong><span>${working ? '1 active · 4 queued' : approved ? '1 complete · 1 queued' : '1 waiting · 4 queued'}</span></div><div class="agent-graph"><article class="agent-card ${working ? 'running' : 'complete'}"><div class="agent-icon strategy">◈</div><div><h3>Strategist</h3><p>${statusLabel}</p></div>${working ? '<span class="pulse-ring"></span>' : '<span class="status-icon">✓</span>'}</article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon research">⌕</div><div><h3>Researcher</h3><p>${approved ? 'Ready to start' : 'Waiting for approval'}</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon ux">◇</div><div><h3>UX Designer</h3><p>Queued</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon architecture">⬡</div><div><h3>Architect</h3><p>Queued</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon engineer">▤</div><div><h3>Engineer</h3><p>Queued</p></div><span class="status-icon">○</span></article></div><div class="agent-metrics"><span><b>${working ? '1.8k' : '2.4k'}</b> tokens</span><span><b>0</b> tool calls</span></div></aside><section class="artifact-panel panel"><div class="artifact-toolbar"><div><span class="file-icon">▧</span><div><h2>Product requirements</h2><p>${working ? 'Generating version 1' : 'Version 1 · Generated by Strategist'}</p></div></div><div class="artifact-actions"><button>v1⌄</button><button>•••</button></div></div>${artifact}${reviewBar}</section><aside class="activity-panel panel"><div class="panel-head"><span>LIVE ACTIVITY</span><button>≡</button></div><div class="activity-summary"><span class="live-dot"></span><strong>${working ? 'Run in progress' : approved ? 'Run resumed' : 'Run paused'}</strong><small>Saved locally</small></div><div class="activity-stream"><article class="activity-item active-event"><time>NOW</time><div class="timeline-mark ${working ? '' : 'done'}"></div><div><strong>${working ? 'Strategist working' : approved ? 'Artifact approved' : 'Approval requested'}</strong><p>${working ? 'Defining the smallest coherent product' : approved ? 'Researcher is cleared to begin' : 'Product brief v1 is ready for review'}</p><span class="event-chip">${working ? 'WORKING' : approved ? 'APPROVED' : 'PAUSED'}</span></div></article><article class="activity-item"><time>NOW</time><div class="timeline-mark done"></div><div><strong>Execution plan approved</strong><p>Five specialist agents scheduled</p></div></article><article class="activity-item"><time>NOW</time><div class="timeline-mark done"></div><div><strong>Project created</strong><p>${escapeHtml(project.name)} · ${escapeHtml(project.type)}</p></div></article></div><div class="next-gate"><span>NEXT STEP</span><strong>${working ? 'Product brief' : approved ? 'Research report' : 'Your approval'}</strong><p>${working ? 'Expected in a few seconds' : approved ? 'Ready for the next build phase' : 'Review the artifact to continue'}</p></div></aside></section>`;
+  const connected = Boolean(project.backendProjectId);
+  return `<section class="workspace-head"><div><div class="breadcrumb"><span>${escapeHtml(project.name)}</span><b>/</b><span>Product definition</span></div><h1>Agent workspace</h1></div><div class="head-actions"><button class="ghost-button">Pause run</button><button class="primary-button dashboard-return">View projects <span>↗</span></button></div></section><div class="demo-notice ${connected ? 'connected-notice' : ''}"><span>${connected ? 'API CONNECTED' : 'LOCAL DEMO RUN'}</span><p>${connected ? 'Projects, workflow events, artifact versions, and approvals are persisted by Forge API.' : 'This project is saved on this device. Configure the API in Setup to use the service layer.'}</p></div><section class="control-grid dynamic-control"><aside class="agents-panel panel"><div class="panel-head"><span>EXECUTION GRAPH</span><button>•••</button></div><div class="graph-status"><strong>5 agents</strong><span>${working ? '1 active · 4 queued' : approved ? '1 complete · 1 queued' : '1 waiting · 4 queued'}</span></div><div class="agent-graph"><article class="agent-card ${working ? 'running' : 'complete'}"><div class="agent-icon strategy">◈</div><div><h3>Strategist</h3><p>${statusLabel}</p></div>${working ? '<span class="pulse-ring"></span>' : '<span class="status-icon">✓</span>'}</article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon research">⌕</div><div><h3>Researcher</h3><p>${approved ? 'Ready to start' : 'Waiting for approval'}</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon ux">◇</div><div><h3>UX Designer</h3><p>Queued</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon architecture">⬡</div><div><h3>Architect</h3><p>Queued</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon engineer">▤</div><div><h3>Engineer</h3><p>Queued</p></div><span class="status-icon">○</span></article></div><div class="agent-metrics"><span><b>${working ? '1.8k' : '2.4k'}</b> tokens</span><span><b>0</b> tool calls</span></div></aside><section class="artifact-panel panel"><div class="artifact-toolbar"><div><span class="file-icon">▧</span><div><h2>Product requirements</h2><p>${working ? 'Generating version 1' : `Version ${project.artifactVersion || 1} · Generated by Strategist`}</p></div></div><div class="artifact-actions"><button>v${project.artifactVersion || 1}⌄</button><button>•••</button></div></div>${artifact}${reviewBar}</section><aside class="activity-panel panel"><div class="panel-head"><span>LIVE ACTIVITY</span><button>≡</button></div><div class="activity-summary"><span class="live-dot"></span><strong>${working ? 'Run in progress' : approved ? 'Run resumed' : 'Run paused'}</strong><small>${connected ? 'API events' : 'Saved locally'}</small></div><div class="activity-stream"><article class="activity-item active-event"><time>NOW</time><div class="timeline-mark ${working ? '' : 'done'}"></div><div><strong>${working ? 'Strategist working' : approved ? 'Artifact approved' : 'Approval requested'}</strong><p>${working ? 'Defining the smallest coherent product' : approved ? 'Researcher is cleared to begin' : 'Product brief v1 is ready for review'}</p><span class="event-chip">${working ? 'WORKING' : approved ? 'APPROVED' : 'PAUSED'}</span></div></article><article class="activity-item"><time>NOW</time><div class="timeline-mark done"></div><div><strong>Execution plan approved</strong><p>Five specialist agents scheduled</p></div></article><article class="activity-item"><time>NOW</time><div class="timeline-mark done"></div><div><strong>Project created</strong><p>${escapeHtml(project.name)} · ${escapeHtml(project.type)}</p></div></article></div><div class="next-gate"><span>NEXT STEP</span><strong>${working ? 'Product brief' : approved ? 'Research report' : 'Your approval'}</strong><p>${working ? 'Expected shortly' : approved ? 'Ready for the next build phase' : 'Review the artifact to continue'}</p></div></aside></section>`;
 }
 
 const views = { workspace: workspaceView, dashboard: dashboardView, architecture: architectureView, backlog: backlogView };
@@ -160,6 +178,34 @@ function showToolCall() {
   showModal(`<header><div><span class="orange-label">MCP INVOCATION / 008</span><h2>Web research completed</h2></div><button data-close aria-label="Close">×</button></header><div class="call-status"><span>✓</span><div><strong>Successful</strong><p>Completed in 1.24 seconds</p></div></div><dl class="tool-details"><div><dt>SERVER</dt><dd>search</dd></div><div><dt>TOOL</dt><dd>search_query</dd></div><div><dt>AGENT</dt><dd>Researcher</dd></div><div><dt>PERMISSION</dt><dd>Read only</dd></div></dl><div class="argument-block"><span>ARGUMENTS</span><code>{<br>&nbsp; "query": "student dropout prediction datasets",<br>&nbsp; "limit": 20<br>}</code></div><div class="result-block"><span>RESULT</span><strong>18 sources retained</strong><p>6 academic papers · 4 datasets · 8 implementation references</p></div><footer><button class="ghost-button" data-close>Close</button><button class="primary-button">Open full trace ↗</button></footer>`, 'tool-modal');
 }
 
+function showBackendSettings() {
+  const modal = showModal(`<header><div><span class="orange-label">RUNTIME SETUP</span><h2>Connect Forge API</h2><p>Use the service locally or point Forge at a deployed HTTPS endpoint.</p></div><button data-close aria-label="Close">×</button></header><div class="backend-form"><label>API BASE URL<input class="api-url-input" value="${escapeHtml(apiUrl || 'http://127.0.0.1:8000')}" placeholder="https://api.example.com"></label><div class="connection-state ${apiUrl ? 'configured' : ''}"><span></span><div><strong>${apiUrl ? 'Endpoint configured' : 'Demo mode active'}</strong><p>${apiUrl ? escapeHtml(apiUrl) : 'Projects are currently stored only on this device.'}</p></div></div><p class="setup-help">Start the included FastAPI service, test the connection, then save. New projects will use persisted runs, artifacts, approvals, and SSE events.</p></div><footer><button class="danger-button disconnect-api" ${apiUrl ? '' : 'disabled'}>Disconnect</button><button class="ghost-button test-api">Test connection</button><button class="primary-button save-api">Save endpoint</button></footer>`, 'settings-modal');
+  const input = modal.querySelector('.api-url-input');
+  modal.querySelector('.test-api').addEventListener('click', async () => {
+    const candidate = input.value.trim().replace(/\/$/, '');
+    try {
+      const response = await fetch(`${candidate}/health`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const health = await response.json();
+      showToast(`Forge API connected · ${health.agent_provider} provider`);
+    } catch {
+      showToast('Connection failed · Start the API and check this URL');
+    }
+  });
+  modal.querySelector('.save-api').addEventListener('click', () => {
+    apiUrl = input.value.trim().replace(/\/$/, '');
+    localStorage.setItem('forge-api-url', apiUrl);
+    modal.remove();
+    showToast('API endpoint saved · New projects will use it');
+  });
+  modal.querySelector('.disconnect-api').addEventListener('click', () => {
+    apiUrl = '';
+    localStorage.removeItem('forge-api-url');
+    modal.remove();
+    showToast('API disconnected · Local demo mode is active');
+  });
+}
+
 function showRevise() {
   const modal = showModal(`<header><div><span class="orange-label">REVISION REQUEST</span><h2>Redirect the Strategist</h2></div><button data-close>×</button></header><label class="revision-label">What should change?<textarea autofocus>Focus the MVP on course instructors rather than administrators.</textarea></label><div class="revision-options"><label><input type="checkbox" checked> Preserve approved sections</label><label><input type="checkbox" checked> Create version 4</label></div><footer><button class="ghost-button" data-close>Cancel</button><button class="primary-button" id="send-revision">Send revision →</button></footer>`, 'revision-modal');
   modal.querySelector('#send-revision').addEventListener('click', () => { modal.remove(); showToast('Revision sent · Strategist is working'); });
@@ -179,8 +225,19 @@ function showExecutionPlan(modal, draft) {
   modal.querySelector('#approve-plan').addEventListener('click', () => { modal.remove(); startProject(draft); });
 }
 
-function startProject(draft) {
+async function startProject(draft) {
   const project = { id: `project-${Date.now()}`, ...draft, stage: 'strategist_running', readiness: 8, createdAt: Date.now(), strategistStartedAt: Date.now() };
+  if (apiUrl) {
+    try {
+      const backendProject = await apiRequest('/api/projects', { method: 'POST', body: JSON.stringify({ name: draft.name, idea: draft.idea, project_type: draft.type, goal: draft.goal }) });
+      const run = await apiRequest(`/api/projects/${backendProject.id}/runs`, { method: 'POST' });
+      project.backendProjectId = backendProject.id;
+      project.backendRunId = run.id;
+    } catch (error) {
+      project.backendError = error.message;
+      showToast('API unavailable · continuing in local demo mode');
+    }
+  }
   studioState.projects.unshift(project);
   studioState.activeProjectId = project.id;
   saveStudioState();
@@ -189,9 +246,42 @@ function startProject(draft) {
 }
 
 function resumeStrategist(project) {
+  if (project.backendRunId) {
+    connectRunEvents(project);
+    return;
+  }
   clearTimeout(window.forgeRunTimer);
   const elapsed = Date.now() - project.strategistStartedAt;
   window.forgeRunTimer = setTimeout(() => completeStrategist(project.id), Math.max(400, 3200 - elapsed));
+}
+
+function connectRunEvents(project) {
+  activeEventSource?.close();
+  activeEventSource = new EventSource(`${apiUrl}/api/runs/${project.backendRunId}/events`);
+  activeEventSource.addEventListener('approval.requested', async () => {
+    try {
+      const artifacts = await apiRequest(`/api/projects/${project.backendProjectId}/artifacts`);
+      const artifact = artifacts[0];
+      const version = artifact?.versions?.at(-1);
+      project.backendArtifactId = artifact?.id;
+      project.artifactVersion = artifact?.current_version || 1;
+      project.brief = version?.content || {};
+      project.stage = 'awaiting_approval';
+      project.readiness = 20;
+      saveStudioState();
+      activeEventSource.close();
+      if (currentView === 'workspace' && studioState.activeProjectId === project.id) showView('workspace');
+      showToast('Product brief ready · Your approval is required');
+    } catch (error) {
+      showToast(`Could not load artifact · ${error.message}`);
+    }
+  });
+  activeEventSource.addEventListener('workflow.failed', () => {
+    project.stage = 'failed';
+    saveStudioState();
+    activeEventSource.close();
+    showToast('Strategist run failed · Check the API configuration');
+  });
 }
 
 function completeStrategist(projectId) {
@@ -206,9 +296,16 @@ function completeStrategist(projectId) {
   showToast('Product brief ready · Your approval is required');
 }
 
-function approveGeneratedArtifact() {
+async function approveGeneratedArtifact() {
   const project = activeProject();
   if (!project) return;
+  if (project.backendArtifactId) {
+    try {
+      await apiRequest(`/api/artifacts/${project.backendArtifactId}/approve`, { method: 'POST' });
+    } catch (error) {
+      return showToast(`Approval failed · ${error.message}`);
+    }
+  }
   project.stage = 'strategist_approved';
   project.readiness = 24;
   project.approvedAt = Date.now();
@@ -220,14 +317,29 @@ function approveGeneratedArtifact() {
 function reviseGeneratedArtifact() {
   const project = activeProject();
   const modal = showModal(`<header><div><span class="orange-label">REVISION REQUEST</span><h2>Refine ${escapeHtml(project.name)}</h2></div><button data-close>×</button></header><label class="revision-label">What should change?<textarea autofocus>Make the primary user and measurable outcome more specific.</textarea></label><div class="revision-options"><label><input type="checkbox" checked> Preserve the original idea</label><label><input type="checkbox" checked> Create version 2</label></div><footer><button class="ghost-button" data-close>Cancel</button><button class="primary-button" id="send-generated-revision">Send revision →</button></footer>`, 'revision-modal');
-  modal.querySelector('#send-generated-revision').addEventListener('click', () => {
-    project.stage = 'strategist_running'; project.strategistStartedAt = Date.now(); project.readiness = 12; project.artifactVersion = 2; saveStudioState(); modal.remove(); showView('workspace'); showToast('Revision sent · Strategist is working');
+  modal.querySelector('#send-generated-revision').addEventListener('click', async () => {
+    const instructions = modal.querySelector('textarea').value.trim();
+    if (project.backendArtifactId) {
+      try {
+        await apiRequest(`/api/artifacts/${project.backendArtifactId}/revise`, { method: 'POST', body: JSON.stringify({ instructions }) });
+      } catch (error) {
+        return showToast(`Revision failed · ${error.message}`);
+      }
+    }
+    project.stage = 'strategist_running'; project.strategistStartedAt = Date.now(); project.readiness = 12; project.artifactVersion = (project.artifactVersion || 1) + 1; saveStudioState(); modal.remove(); showView('workspace'); showToast('Revision sent · Strategist is working');
   });
 }
 
-function rejectGeneratedArtifact() {
+async function rejectGeneratedArtifact() {
   const project = activeProject();
   if (!project) return;
+  if (project.backendArtifactId) {
+    try {
+      await apiRequest(`/api/artifacts/${project.backendArtifactId}/reject`, { method: 'POST' });
+    } catch (error) {
+      return showToast(`Regeneration failed · ${error.message}`);
+    }
+  }
   project.stage = 'strategist_running'; project.strategistStartedAt = Date.now(); project.readiness = 10; saveStudioState(); showView('workspace'); showToast('Brief rejected · Strategist is regenerating');
 }
 
@@ -249,5 +361,6 @@ function showToast(message) {
 }
 
 document.querySelectorAll('.rail-item[data-view]').forEach(item => item.addEventListener('click', () => showView(item.dataset.view)));
+document.querySelector('.rail-item[aria-label="Settings"]')?.addEventListener('click', showBackendSettings);
 if (activeProject()) showView('workspace');
 else bindCommon();

@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: forge
+      POSTGRES_USER: forge
+      POSTGRES_PASSWORD: forge
+    ports:
+      - "5432:5432"
+    volumes:
+      - forge_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      FORGE_DATABASE_URL: postgresql+psycopg://forge:forge@postgres:5432/forge
+      FORGE_AGENT_PROVIDER: ${FORGE_AGENT_PROVIDER:-deterministic}
+      FORGE_OPENAI_API_KEY: ${FORGE_OPENAI_API_KEY:-}
+      FORGE_OPENAI_MODEL: ${FORGE_OPENAI_MODEL:-gpt-6-astra}
+      FORGE_CORS_ORIGINS: http://localhost:4174,http://127.0.0.1:4174
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  forge_postgres:
