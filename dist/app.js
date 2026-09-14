@@ -1,5 +1,32 @@
 const app = document.querySelector('#app');
 const workspaceView = app.innerHTML;
+const STORE_KEY = 'forge-studio-state-v1';
+let currentView = 'workspace';
+let studioState = loadStudioState();
+
+function loadStudioState() {
+  try {
+    return JSON.parse(localStorage.getItem(STORE_KEY)) || { projects: [], activeProjectId: null };
+  } catch {
+    return { projects: [], activeProjectId: null };
+  }
+}
+
+function saveStudioState() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(studioState));
+}
+
+function activeProject() {
+  return studioState.projects.find(project => project.id === studioState.activeProjectId) || null;
+}
+
+function escapeHtml(value = '') {
+  return value.replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+}
+
+function initials(name) {
+  return name.split(/\s+/).map(word => word[0]).join('').slice(0, 2).toUpperCase() || 'NP';
+}
 
 const dashboardView = `
   <section class="workspace-head dashboard-title">
@@ -49,6 +76,30 @@ const backlogView = `
     <div class="kanban-column"><header><div><span>DONE</span><b>3</b></div><button>＋</button></header><article class="task-card done-card"><div><span class="task-type">ARCH-01</span><span class="complete-tag">✓ DONE</span></div><h3>System architecture</h3><p>Define service boundaries and secure data pathways.</p><footer><span class="agent-mini">⬡</span><span>3 pts</span><i>ARCHITECTURE</i></footer></article><article class="task-card done-card"><div><span class="task-type">UX-01</span><span class="complete-tag">✓ DONE</span></div><h3>Instructor journey</h3><p>Map review, evidence, and intervention workflow.</p><footer><span class="agent-mini orange">◇</span><span>3 pts</span><i>EXPERIENCE</i></footer></article></div>
   </section>`;
 
+function dashboardWithProjects() {
+  if (!studioState.projects.length) return dashboardView;
+  const cards = studioState.projects.map(project => {
+    const waiting = project.stage === 'awaiting_approval';
+    const status = waiting ? 'Approval needed' : project.stage === 'strategist_running' ? 'Strategist working' : 'In progress';
+    return `<article class="project-card featured saved-project" data-project-id="${project.id}"><div class="project-top"><span class="project-code">${initials(project.name)}</span><span class="project-status ${waiting ? 'needs-approval' : 'active-status'}"><i></i> ${status}</span></div><div><span class="project-domain">${escapeHtml(project.type.toUpperCase())} / ${escapeHtml(project.goal.toUpperCase())}</span><h3>${escapeHtml(project.name)}</h3><p>${escapeHtml(project.idea)}</p></div><div class="progress-row"><div><span>READINESS</span><b>${project.readiness}%</b></div><progress value="${project.readiness}" max="100"></progress></div><div class="project-foot"><span>5 agents</span><span>${project.stage === 'awaiting_approval' ? '1 artifact' : 'Run active'}</span><time>Updated now</time></div></article>`;
+  }).join('');
+  return dashboardView
+    .replace('<strong>03</strong><small>+1 this week</small>', `<strong>${String(3 + studioState.projects.length).padStart(2, '0')}</strong><small>+${studioState.projects.length} created here</small>`)
+    .replace('<strong>04</strong><small>Needs your attention</small>', `<strong>${String(4 + studioState.projects.filter(project => project.stage === 'awaiting_approval').length).padStart(2, '0')}</strong><small>Needs your attention</small>`)
+    .replace('<div class="project-grid">', `<div class="project-grid">${cards}`);
+}
+
+function generatedWorkspace(project) {
+  const working = project.stage === 'strategist_running';
+  const approved = project.stage === 'strategist_approved';
+  const statusLabel = working ? 'Structuring product brief' : approved ? 'Brief approved' : 'Waiting for your approval';
+  const artifact = working ? `
+    <article class="document run-document"><div class="generation-state"><span class="spinner"></span><div><strong>Strategist is shaping the brief</strong><p>Clarifying the user, problem, MVP boundary, and success measures.</p></div></div><div class="skeleton-line wide"></div><div class="skeleton-line title"></div><div class="skeleton-line medium"></div><hr><div class="skeleton-grid"><span></span><div><i></i><i></i><i></i></div></div><div class="thinking-log"><span>LIVE REASONING TRACE</span><p class="trace-line">Separating the core job from implementation details…</p></div></article>` : `
+    <article class="document generated-document"><div class="approval-banner ${approved ? '' : 'pending-banner'}"><span>${approved ? '✓' : '!'}</span><p><strong>${approved ? 'Approved artifact' : 'Approval required'}</strong><br>${approved ? 'Research may now use this version.' : 'Review this brief before downstream agents continue.'}</p><time>NOW</time></div><div class="doc-kicker">PRODUCT BRIEF / 01</div><h2>${escapeHtml(project.name)}<br><em>from idea to focus.</em></h2><p class="lede">${escapeHtml(project.idea)}</p><hr><div class="doc-section"><span>01</span><div><h3>Problem</h3><p>The current experience is fragmented, difficult to evaluate, and lacks a clear path from raw input to a confident decision.</p></div></div><div class="doc-section"><span>02</span><div><h3>Primary user</h3><div class="user-card"><span>PU</span><div><strong>Primary operator</strong><p>The person responsible for acting on the product's central insight.</p></div></div></div></div><div class="doc-section"><span>03</span><div><h3>MVP outcomes</h3><ul><li><i>1</i>Capture the minimum useful inputs</li><li><i>2</i>Produce a clear, explainable output</li><li><i>3</i>Close the loop with a recommended action</li></ul></div></div></article>`;
+  const reviewBar = working ? `<div class="review-bar run-review"><span>Approval controls unlock when the artifact is ready.</span><button class="approve-button" disabled>Generating…</button></div>` : approved ? `<div class="review-bar"><div><button class="ghost-button dashboard-return">View projects</button></div><button class="approve-button"><span>✓</span> Approved</button></div>` : `<div class="review-bar"><div><button class="danger-button generated-reject">Reject</button><button class="ghost-button generated-revise">Revise</button></div><button class="approve-button approve-generated">Approve & continue →</button></div>`;
+  return `<section class="workspace-head"><div><div class="breadcrumb"><span>${escapeHtml(project.name)}</span><b>/</b><span>Product definition</span></div><h1>Agent workspace</h1></div><div class="head-actions"><button class="ghost-button">Pause run</button><button class="primary-button dashboard-return">View projects <span>↗</span></button></div></section><div class="demo-notice"><span>LOCAL DEMO RUN</span><p>This project is saved on this device. Connect the backend to replace deterministic generation with live agents.</p></div><section class="control-grid dynamic-control"><aside class="agents-panel panel"><div class="panel-head"><span>EXECUTION GRAPH</span><button>•••</button></div><div class="graph-status"><strong>5 agents</strong><span>${working ? '1 active · 4 queued' : approved ? '1 complete · 1 queued' : '1 waiting · 4 queued'}</span></div><div class="agent-graph"><article class="agent-card ${working ? 'running' : 'complete'}"><div class="agent-icon strategy">◈</div><div><h3>Strategist</h3><p>${statusLabel}</p></div>${working ? '<span class="pulse-ring"></span>' : '<span class="status-icon">✓</span>'}</article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon research">⌕</div><div><h3>Researcher</h3><p>${approved ? 'Ready to start' : 'Waiting for approval'}</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon ux">◇</div><div><h3>UX Designer</h3><p>Queued</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon architecture">⬡</div><div><h3>Architect</h3><p>Queued</p></div><span class="status-icon">○</span></article><div class="flow-line muted"></div><article class="agent-card waiting"><div class="agent-icon engineer">▤</div><div><h3>Engineer</h3><p>Queued</p></div><span class="status-icon">○</span></article></div><div class="agent-metrics"><span><b>${working ? '1.8k' : '2.4k'}</b> tokens</span><span><b>0</b> tool calls</span></div></aside><section class="artifact-panel panel"><div class="artifact-toolbar"><div><span class="file-icon">▧</span><div><h2>Product requirements</h2><p>${working ? 'Generating version 1' : 'Version 1 · Generated by Strategist'}</p></div></div><div class="artifact-actions"><button>v1⌄</button><button>•••</button></div></div>${artifact}${reviewBar}</section><aside class="activity-panel panel"><div class="panel-head"><span>LIVE ACTIVITY</span><button>≡</button></div><div class="activity-summary"><span class="live-dot"></span><strong>${working ? 'Run in progress' : approved ? 'Run resumed' : 'Run paused'}</strong><small>Saved locally</small></div><div class="activity-stream"><article class="activity-item active-event"><time>NOW</time><div class="timeline-mark ${working ? '' : 'done'}"></div><div><strong>${working ? 'Strategist working' : approved ? 'Artifact approved' : 'Approval requested'}</strong><p>${working ? 'Defining the smallest coherent product' : approved ? 'Researcher is cleared to begin' : 'Product brief v1 is ready for review'}</p><span class="event-chip">${working ? 'WORKING' : approved ? 'APPROVED' : 'PAUSED'}</span></div></article><article class="activity-item"><time>NOW</time><div class="timeline-mark done"></div><div><strong>Execution plan approved</strong><p>Five specialist agents scheduled</p></div></article><article class="activity-item"><time>NOW</time><div class="timeline-mark done"></div><div><strong>Project created</strong><p>${escapeHtml(project.name)} · ${escapeHtml(project.type)}</p></div></article></div><div class="next-gate"><span>NEXT STEP</span><strong>${working ? 'Product brief' : approved ? 'Research report' : 'Your approval'}</strong><p>${working ? 'Expected in a few seconds' : approved ? 'Ready for the next build phase' : 'Review the artifact to continue'}</p></div></aside></section>`;
+}
+
 const views = { workspace: workspaceView, dashboard: dashboardView, architecture: architectureView, backlog: backlogView };
 
 function bindCommon() {
@@ -57,12 +108,17 @@ function bindCommon() {
     button.addEventListener('pointerup', () => button.classList.remove('pressed'));
     button.addEventListener('pointerleave', () => button.classList.remove('pressed'));
   });
-  document.querySelectorAll('[data-open="workspace"]').forEach(card => card.addEventListener('click', () => showView('workspace')));
+  document.querySelectorAll('[data-open="workspace"]').forEach(card => card.addEventListener('click', () => { studioState.activeProjectId = null; saveStudioState(); showView('workspace'); }));
+  document.querySelectorAll('[data-project-id]').forEach(card => card.addEventListener('click', () => { studioState.activeProjectId = card.dataset.projectId; saveStudioState(); showView('workspace'); }));
   document.querySelector('.new-project')?.addEventListener('click', showCreateProject);
   document.querySelector('.tool-link')?.addEventListener('click', showToolCall);
   document.querySelector('.approve-button')?.addEventListener('click', toggleApproval);
   document.querySelector('.danger-button')?.addEventListener('click', () => showToast('Artifact returned to Strategist'));
-  document.querySelector('.review-bar .ghost-button')?.addEventListener('click', showRevise);
+  document.querySelector('.review-bar .ghost-button:not(.dashboard-return):not(.generated-revise)')?.addEventListener('click', showRevise);
+  document.querySelector('.approve-generated')?.addEventListener('click', approveGeneratedArtifact);
+  document.querySelector('.generated-revise')?.addEventListener('click', reviseGeneratedArtifact);
+  document.querySelector('.generated-reject')?.addEventListener('click', rejectGeneratedArtifact);
+  document.querySelectorAll('.dashboard-return').forEach(button => button.addEventListener('click', () => showView('dashboard')));
   document.querySelectorAll('.primary-button').forEach(button => button.addEventListener('click', () => {
     if (button.textContent.includes('View deliverables')) showView('dashboard');
   }));
@@ -79,10 +135,15 @@ function bindCommon() {
 }
 
 function showView(name) {
+  currentView = name;
   app.className = `workspace view-${name}`;
-  app.innerHTML = views[name];
+  const project = activeProject();
+  app.innerHTML = name === 'dashboard' ? dashboardWithProjects() : name === 'workspace' && project ? generatedWorkspace(project) : views[name];
+  const switcher = document.querySelector('.project-switcher button');
+  if (switcher) switcher.innerHTML = `${escapeHtml(project && name === 'workspace' ? project.name : 'PassOrFail.ai')} <span>⌄</span>`;
   document.querySelectorAll('.rail-item[data-view]').forEach(item => item.classList.toggle('active', item.dataset.view === name));
   bindCommon();
+  if (name === 'workspace' && project?.stage === 'strategist_running') resumeStrategist(project);
 }
 
 function showModal(content, extraClass = '') {
@@ -105,13 +166,69 @@ function showRevise() {
 }
 
 function showCreateProject() {
-  const modal = showModal(`<header><div><span class="orange-label">NEW PROJECT</span><h2>What are you trying to build?</h2></div><button data-close>×</button></header><textarea class="idea-input" autofocus>An application that predicts early whether students are likely to pass or fail a course.</textarea><div class="form-row"><label>PROJECT TYPE<select><option>AI product</option><option>SaaS</option><option>Mobile app</option><option>API</option></select></label><label>GOAL<select><option>Production plan</option><option>Prototype</option><option>Explore</option></select></label></div><div class="guardrail-row"><div><span>Approval gates</span><small>Pause after every major artifact</small></div><button class="toggle on" aria-label="Toggle approval gates"><i></i></button></div><footer><button class="ghost-button" data-close>Cancel</button><button class="primary-button" id="build-plan">Build product plan →</button></footer>`, 'create-modal');
-  modal.querySelector('#build-plan').addEventListener('click', () => showExecutionPlan(modal));
+  const modal = showModal(`<header><div><span class="orange-label">NEW PROJECT</span><h2>What are you trying to build?</h2></div><button data-close>×</button></header><label class="project-name-label">PROJECT NAME<input class="project-name-input" value="CourseSignal" maxlength="40"></label><textarea class="idea-input" autofocus>An application that predicts early whether students are likely to pass or fail a course.</textarea><div class="form-row"><label>PROJECT TYPE<select><option>AI product</option><option>SaaS</option><option>Mobile app</option><option>API</option></select></label><label>GOAL<select><option>Production plan</option><option>Prototype</option><option>Explore</option></select></label></div><div class="guardrail-row"><div><span>Approval gates</span><small>Pause after every major artifact</small></div><button class="toggle on" aria-label="Toggle approval gates"><i></i></button></div><footer><button class="ghost-button" data-close>Cancel</button><button class="primary-button" id="build-plan">Build product plan →</button></footer>`, 'create-modal');
+  modal.querySelector('#build-plan').addEventListener('click', () => {
+    const draft = { name: modal.querySelector('.project-name-input').value.trim() || 'Untitled project', idea: modal.querySelector('.idea-input').value.trim(), type: modal.querySelectorAll('select')[0].value, goal: modal.querySelectorAll('select')[1].value };
+    if (!draft.idea) return showToast('Add a product idea before continuing');
+    showExecutionPlan(modal, draft);
+  });
 }
 
-function showExecutionPlan(modal) {
+function showExecutionPlan(modal, draft) {
   modal.querySelector('.modal-card').innerHTML = `<header><div><span class="orange-label">PROPOSED EXECUTION</span><h2>Your agent plan</h2><p>Five specialists · estimated 4 minutes</p></div><button data-close>×</button></header><div class="plan-list"><article><b>1</b><span class="agent-icon strategy">◈</span><div><strong>Product Strategist</strong><p>Define users, value, requirements, and boundaries</p></div><i>••</i></article><article><b>2</b><span class="agent-icon research">⌕</span><div><strong>Research Agent</strong><p>Investigate student-risk approaches and evidence</p></div><i>••</i></article><article><b>3</b><span class="agent-icon ux">◇</span><div><strong>UX Designer</strong><p>Design the instructor review workflow</p></div><i>••</i></article><article><b>4</b><span class="agent-icon architecture">⬡</span><div><strong>Solution Architect</strong><p>Define application and ML system architecture</p></div><i>••</i></article><article><b>5</b><span class="agent-icon engineer">▤</span><div><strong>Engineering Planner</strong><p>Generate backlog, dependencies, and sequence</p></div><i>••</i></article></div><div class="plan-note"><span>◇</span><p><strong>Human control is on.</strong> Forge will pause after each major artifact for your approval.</p></div><footer><button class="ghost-button" data-close>Edit idea</button><button class="primary-button" id="approve-plan">Approve & start run →</button></footer>`;
-  modal.querySelector('#approve-plan').addEventListener('click', () => { modal.remove(); showView('workspace'); showToast('Run 015 started · Strategist is working'); });
+  modal.querySelector('#approve-plan').addEventListener('click', () => { modal.remove(); startProject(draft); });
+}
+
+function startProject(draft) {
+  const project = { id: `project-${Date.now()}`, ...draft, stage: 'strategist_running', readiness: 8, createdAt: Date.now(), strategistStartedAt: Date.now() };
+  studioState.projects.unshift(project);
+  studioState.activeProjectId = project.id;
+  saveStudioState();
+  showView('workspace');
+  showToast(`${project.name} started · Strategist is working`);
+}
+
+function resumeStrategist(project) {
+  clearTimeout(window.forgeRunTimer);
+  const elapsed = Date.now() - project.strategistStartedAt;
+  window.forgeRunTimer = setTimeout(() => completeStrategist(project.id), Math.max(400, 3200 - elapsed));
+}
+
+function completeStrategist(projectId) {
+  const project = studioState.projects.find(item => item.id === projectId);
+  if (!project || project.stage !== 'strategist_running') return;
+  project.stage = 'awaiting_approval';
+  project.readiness = 18;
+  project.artifactVersion = 1;
+  project.updatedAt = Date.now();
+  saveStudioState();
+  if (currentView === 'workspace' && studioState.activeProjectId === projectId) showView('workspace');
+  showToast('Product brief ready · Your approval is required');
+}
+
+function approveGeneratedArtifact() {
+  const project = activeProject();
+  if (!project) return;
+  project.stage = 'strategist_approved';
+  project.readiness = 24;
+  project.approvedAt = Date.now();
+  saveStudioState();
+  showView('workspace');
+  showToast('Brief approved · Research is ready to begin');
+}
+
+function reviseGeneratedArtifact() {
+  const project = activeProject();
+  const modal = showModal(`<header><div><span class="orange-label">REVISION REQUEST</span><h2>Refine ${escapeHtml(project.name)}</h2></div><button data-close>×</button></header><label class="revision-label">What should change?<textarea autofocus>Make the primary user and measurable outcome more specific.</textarea></label><div class="revision-options"><label><input type="checkbox" checked> Preserve the original idea</label><label><input type="checkbox" checked> Create version 2</label></div><footer><button class="ghost-button" data-close>Cancel</button><button class="primary-button" id="send-generated-revision">Send revision →</button></footer>`, 'revision-modal');
+  modal.querySelector('#send-generated-revision').addEventListener('click', () => {
+    project.stage = 'strategist_running'; project.strategistStartedAt = Date.now(); project.readiness = 12; project.artifactVersion = 2; saveStudioState(); modal.remove(); showView('workspace'); showToast('Revision sent · Strategist is working');
+  });
+}
+
+function rejectGeneratedArtifact() {
+  const project = activeProject();
+  if (!project) return;
+  project.stage = 'strategist_running'; project.strategistStartedAt = Date.now(); project.readiness = 10; saveStudioState(); showView('workspace'); showToast('Brief rejected · Strategist is regenerating');
 }
 
 function toggleApproval(event) {
@@ -132,4 +249,5 @@ function showToast(message) {
 }
 
 document.querySelectorAll('.rail-item[data-view]').forEach(item => item.addEventListener('click', () => showView(item.dataset.view)));
-bindCommon();
+if (activeProject()) showView('workspace');
+else bindCommon();
